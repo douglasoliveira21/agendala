@@ -1,0 +1,686 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String          @id @default(cuid())
+  email               String          @unique
+  name                String
+  phone               String?
+  whatsappCountryCode String?
+  whatsappAreaCode    String?
+  whatsappNumber      String?
+  whatsappFullNumber  String?
+  password            String
+  role                UserRole        @default(CLIENT)
+  avatar              String?
+  address             String?
+  city                String?
+  state               String?
+  zipCode             String?
+  bio                 String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  accounts            Account[]
+  apiKeys             ApiKey[]
+  appointments        Appointment[]
+  restores            BackupRestore[]
+  backups             Backup[]
+  companies           Company[]
+  companyUsers        CompanyUser[]
+  couponUsages        CouponUsage[]
+  notifications       Notification[]
+  reviews             Review[]
+  sessions            Session[]
+  stores              Store[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Company {
+  id             String               @id @default(cuid())
+  name           String
+  slug           String               @unique
+  description    String?
+  logo           String?
+  website        String?
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  state          String?
+  zipCode        String?
+  country        String               @default("BR")
+  timezone       String               @default("America/Sao_Paulo")
+  currency       String               @default("BRL")
+  language       String               @default("pt-BR")
+  primaryColor   String               @default("#3B82F6")
+  secondaryColor String               @default("#1F2937")
+  maxStores      Int                  @default(1)
+  maxUsers       Int                  @default(5)
+  active         Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  ownerId        String
+  apiKeys        ApiKey[]
+  restores       BackupRestore[]
+  backups        Backup[]
+  owner          User                 @relation(fields: [ownerId], references: [id])
+  subscription   CompanySubscription?
+  users          CompanyUser[]
+  stores         Store[]
+
+  @@map("companies")
+}
+
+model CompanyUser {
+  id        String      @id @default(cuid())
+  role      CompanyRole @default(MEMBER)
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  companyId String
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@map("company_users")
+}
+
+model CompanySubscription {
+  id                   String                    @id @default(cuid())
+  status               CompanySubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean                   @default(false)
+  canceledAt           DateTime?
+  stripeSubscriptionId String?                   @unique
+  stripeCustomerId     String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  companyId            String                    @unique
+  planId               String
+  payments             CompanyPayment[]
+  plan                 CompanyPlan               @relation(fields: [planId], references: [id])
+  company              Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_subscriptions")
+}
+
+model CompanyPlan {
+  id              String                @id @default(cuid())
+  name            String
+  description     String?
+  price           Float
+  interval        String
+  features        Json
+  maxStores       Int                   @default(1)
+  maxUsers        Int                   @default(5)
+  maxServices     Int                   @default(50)
+  maxAppointments Int                   @default(1000)
+  active          Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  subscriptions   CompanySubscription[]
+
+  @@map("company_plans")
+}
+
+model CompanyPayment {
+  id              String               @id @default(cuid())
+  amount          Float
+  currency        String               @default("BRL")
+  status          CompanyPaymentStatus @default(PENDING)
+  paymentMethod   String?
+  stripePaymentId String?              @unique
+  stripeSessionId String?              @unique
+  gatewayResponse Json?
+  description     String?
+  metadata        Json?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  subscriptionId  String
+  subscription    CompanySubscription  @relation(fields: [subscriptionId], references: [id])
+
+  @@map("company_payments")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  slug        String   @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  stores      Store[]
+
+  @@map("categories")
+}
+
+model Store {
+  id                  String             @id @default(cuid())
+  name                String
+  slug                String             @unique
+  description         String?
+  logo                String?
+  banner              String?
+  phone               String
+  email               String?
+  address             String?
+  city                String?
+  state               String?
+  zipCode             String?
+  active              Boolean            @default(true)
+  primaryColor        String             @default("#3B82F6")
+  secondaryColor      String             @default("#1F2937")
+  whatsappCountryCode String?
+  whatsappAreaCode    String?
+  whatsappNumber      String?
+  whatsappFullNumber  String?
+  whatsappConnected   Boolean            @default(false)
+  whatsappSessionId   String?
+  whatsappApiKey      String?
+  whatsappStatus      String?
+  workingHours        Json?
+  advanceBookingDays  Int                @default(30)
+  minAdvanceHours     Int                @default(2)
+  allowSimpleBooking  Boolean            @default(false)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  companyId           String?
+  ownerId             String
+  categoryId          String
+  coverImage          String?
+  logoImage           String?
+  apiKeys             ApiKey[]
+  appointments        Appointment[]
+  restores            BackupRestore[]
+  backups             Backup[]
+  coupons             Coupon[]
+  reviews             Review[]
+  services            Service[]
+  plans               StorePlan[]
+  category            Category           @relation(fields: [categoryId], references: [id])
+  owner               User               @relation(fields: [ownerId], references: [id])
+  company             Company?           @relation(fields: [companyId], references: [id])
+  whatsappTemplates   WhatsAppTemplate[]
+
+  @@map("stores")
+}
+
+model Service {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  price        Float
+  duration     Int
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  storeId      String
+  appointments Appointment[]
+  store        Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("services")
+}
+
+model Appointment {
+  id               String            @id @default(cuid())
+  date             DateTime
+  startTime        String
+  endTime          String
+  status           AppointmentStatus @default(PENDING)
+  notes            String?
+  clientName       String
+  clientPhone      String
+  clientEmail      String?
+  totalPrice       Float?
+  isSimpleBooking  Boolean           @default(false)
+  confirmationSent Boolean           @default(false)
+  reminderSent     Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  storeId          String
+  serviceId        String
+  clientId         String?
+  client           User?             @relation(fields: [clientId], references: [id])
+  service          Service           @relation(fields: [serviceId], references: [id])
+  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  couponUsage      CouponUsage?
+  payment          Payment?
+
+  @@map("appointments")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+  @@map("reviews")
+}
+
+model Plan {
+  id              String      @id @default(cuid())
+  name            String
+  description     String?
+  price           Float
+  interval        String
+  features        Json
+  maxStores       Int         @default(1)
+  maxServices     Int         @default(10)
+  maxAppointments Int         @default(100)
+  active          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  storePlans      StorePlan[]
+
+  @@map("plans")
+}
+
+model StorePlan {
+  id           String        @id @default(cuid())
+  startDate    DateTime      @default(now())
+  endDate      DateTime?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  storeId      String
+  planId       String
+  plan         Plan          @relation(fields: [planId], references: [id])
+  store        Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  subscription Subscription?
+
+  @@map("store_plans")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  amount          Float
+  currency        String        @default("BRL")
+  status          PaymentStatus @default(PENDING)
+  paymentMethod   String?
+  stripePaymentId String?       @unique
+  stripeSessionId String?       @unique
+  gatewayResponse Json?
+  description     String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  appointmentId   String?       @unique
+  subscriptionId  String?
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+  appointment     Appointment?  @relation(fields: [appointmentId], references: [id])
+
+  @@map("payments")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  canceledAt           DateTime?
+  stripeSubscriptionId String?            @unique
+  stripeCustomerId     String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  storePlanId          String             @unique
+  payments             Payment[]
+  storePlan            StorePlan          @relation(fields: [storePlanId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model WhatsAppSession {
+  id        String    @id @default(cuid())
+  sessionId String    @unique
+  storeId   String    @unique
+  qrCode    String?
+  connected Boolean   @default(false)
+  lastSeen  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("whatsapp_sessions")
+}
+
+model WhatsAppMessage {
+  id        String        @id @default(cuid())
+  storeId   String
+  phone     String
+  message   String
+  type      MessageType
+  status    MessageStatus @default(PENDING)
+  sentAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@map("whatsapp_messages")
+}
+
+model WhatsAppTemplate {
+  id        String      @id @default(cuid())
+  storeId   String
+  name      String
+  type      MessageType
+  template  String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  store     Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_templates")
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  userId    String
+  data      Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Coupon {
+  id             String        @id @default(cuid())
+  code           String        @unique
+  name           String
+  description    String?
+  type           CouponType    @default(PERCENTAGE)
+  value          Float
+  minAmount      Float?
+  maxDiscount    Float?
+  usageLimit     Int?
+  usageCount     Int           @default(0)
+  userUsageLimit Int?
+  active         Boolean       @default(true)
+  startDate      DateTime      @default(now())
+  endDate        DateTime?
+  storeId        String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  usages         CouponUsage[]
+  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id             String       @id @default(cuid())
+  userId         String
+  couponId       String
+  appointmentId  String?      @unique
+  discountAmount Float
+  createdAt      DateTime     @default(now())
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id])
+  coupon         Coupon       @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, couponId])
+  @@map("coupon_usages")
+}
+
+model Backup {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  type        BackupType      @default(FULL)
+  status      BackupStatus    @default(PENDING)
+  size        BigInt?
+  filePath    String?
+  compressed  Boolean         @default(false)
+  companyId   String?
+  storeId     String?
+  createdById String
+  metadata    Json?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  restores    BackupRestore[]
+  createdBy   User            @relation(fields: [createdById], references: [id])
+  store       Store?          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  company     Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("backups")
+}
+
+model BackupRestore {
+  id            String        @id @default(cuid())
+  backupId      String
+  status        RestoreStatus @default(PENDING)
+  dropExisting  Boolean       @default(false)
+  restoreData   Boolean       @default(true)
+  restoreSchema Boolean       @default(true)
+  companyId     String?
+  storeId       String?
+  createdById   String
+  error         String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  createdBy     User          @relation(fields: [createdById], references: [id])
+  store         Store?        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  company       Company?      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  backup        Backup        @relation(fields: [backupId], references: [id], onDelete: Cascade)
+
+  @@map("backup_restores")
+}
+
+model ApiKey {
+  id          String        @id @default(cuid())
+  name        String
+  key         String        @unique
+  prefix      String
+  permissions Json
+  active      Boolean       @default(true)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  rateLimit   Int           @default(1000)
+  companyId   String?
+  storeId     String?
+  createdById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdBy   User          @relation(fields: [createdById], references: [id])
+  store       Store?        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  company     Company?      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  usageLogs   ApiUsageLog[]
+
+  @@map("api_keys")
+}
+
+model ApiUsageLog {
+  id           String   @id @default(cuid())
+  method       String
+  endpoint     String
+  statusCode   Int
+  responseTime Int
+  ipAddress    String?
+  userAgent    String?
+  apiKeyId     String
+  createdAt    DateTime @default(now())
+  apiKey       ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@map("api_usage_logs")
+}
+
+enum UserRole {
+  CLIENT
+  STORE_OWNER
+  ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum MessageType {
+  CONFIRMATION
+  REMINDER
+  CANCELLATION
+  CUSTOM
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  UNPAID
+  INCOMPLETE
+}
+
+enum NotificationType {
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_REMINDER
+  PAYMENT_RECEIVED
+  PAYMENT_FAILED
+  SUBSCRIPTION_EXPIRED
+  SYSTEM_ALERT
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum CompanyRole {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+enum CompanySubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  UNPAID
+  INCOMPLETE
+  TRIALING
+}
+
+enum CompanyPaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum BackupType {
+  FULL
+  INCREMENTAL
+  SCHEMA_ONLY
+  DATA_ONLY
+}
+
+enum BackupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum RestoreStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
